@@ -1,0 +1,20 @@
+.modal-dark {
+    background-color: #121212;
+    color: #c5c5c5;
+  }
+  .modal-content-dark {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+    border-radius: 8px;
+    background: #1e1e1e;
+  }
+  button {
+    background-color: #6200ee;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
