@@ -123,8 +123,8 @@ const SolanaCreateToken = ({ setLoader }) => {
       formData.append("file", file);
       const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
         headers: {
-          pinata_api_key: process.env.PINATA_API_KEY,
-          pinata_secret_api_key: process.env.PINATA_SECRET_KEY,
+          pinata_api_key: process.env.NEXT_PUBLIC_PINATA_API_KEY,
+          pinata_secret_api_key: process.env.NEXT_PUBLIC_PINATA_SECRET_KEY,
         },
       });
       updateToken({ ...token, image: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}` });
