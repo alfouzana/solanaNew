@@ -20,8 +20,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import useUserSOLBalanceStore from "../../solana/stores/useUserSOLBalanceStore";
-import { useNetworkConfiguration } from "../../solana/contexts/NetworkConfigurationProvider";
+import useUserSOLBalanceStore from "../solana/stores/useUserSOLBalanceStore";
+import { useNetworkConfiguration } from "../solana/contexts/NetworkConfigurationProvider";
 import UploadICON from "./UploadICON";
 import Input from "./Input";
 
