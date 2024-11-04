@@ -50,6 +50,8 @@ const SolanaCreateToken = ({ setLoader }) => {
 
     try {
       setLoader(true);
+      console.log("Initializing token creation...");
+
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
       const mintKeypair = Keypair.generate();
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
@@ -91,8 +93,8 @@ const SolanaCreateToken = ({ setLoader }) => {
                 uri: metadataUrl,
                 creators: null,
                 sellerFeeBasisPoints: 0,
-                collection: null,  // Explicitly include the collection field
-                uses: null,        // Also include uses if required by your version
+                collection: null,
+                uses: null,
               },
               isMutable: false,
               collectionDetails: null,
@@ -101,8 +103,11 @@ const SolanaCreateToken = ({ setLoader }) => {
         )
       );
 
+      console.log("Charging fee...");
       await chargeFee();
+      console.log("Sending transaction...");
       const signature = await sendTransaction(transaction, connection, { signers: [mintKeypair] });
+      console.log("Transaction signature:", signature);
       setTokenMintAddress(mintKeypair.publicKey.toString());
       notifySuccess("Token created successfully!");
 
@@ -115,16 +120,23 @@ const SolanaCreateToken = ({ setLoader }) => {
   }, [publicKey, connection, sendTransaction, setLoader, token]);
 
   const chargeFee = useCallback(async () => {
-    const receiverAddress = new PublicKey(SOLANA_RECEIVER);
-    const transaction = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: publicKey,
-        toPubkey: receiverAddress,
-        lamports: LAMPORTS_PER_SOL * Number(SOLANA_FEE),
-      })
-    );
-    await sendTransaction(transaction, connection);
-    notifySuccess("Fee charged successfully!");
+    try {
+      const receiverAddress = new PublicKey(SOLANA_RECEIVER);
+      console.log("Charging fee to receiver:", receiverAddress.toString());
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: receiverAddress,
+          lamports: LAMPORTS_PER_SOL * Number(SOLANA_FEE),
+        })
+      );
+      const signature = await sendTransaction(transaction, connection);
+      console.log("Fee transaction signature:", signature);
+      notifySuccess("Fee charged successfully!");
+    } catch (error) {
+      console.error("Fee transaction failed:", error);
+      notifyError("Fee transaction failed");
+    }
   }, [publicKey, sendTransaction, connection, SOLANA_RECEIVER, SOLANA_FEE]);
 
   const uploadMetadata = async (token) => {
@@ -143,7 +155,7 @@ const SolanaCreateToken = ({ setLoader }) => {
           "Content-Type": "application/json",
         },
       });
-      console.log("Metadata uploaded successfully.");
+      console.log("Metadata uploaded successfully, IPFS URL:", `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`);
       return `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
     } catch (error) {
       console.error("Error uploading metadata to IPFS:", error);
@@ -165,8 +177,9 @@ const SolanaCreateToken = ({ setLoader }) => {
             pinata_secret_api_key: PINATA_SECRET_KEY,
           },
         });
-        updateToken({ ...token, image: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}` });
-        console.log("Image uploaded, IPFS URL:", `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`);
+        const imageUrl = `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
+        updateToken({ ...token, image: imageUrl });
+        console.log("Image uploaded successfully, IPFS URL:", imageUrl);
       } catch (error) {
         console.error("Error uploading image to IPFS:", error);
         notifyError("Image upload failed");
