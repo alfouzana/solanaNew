@@ -1,5 +1,3 @@
-// components/SolanaCreateToken.js
-
 import React, { useState, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -21,7 +19,6 @@ import { createCreateMetadataAccountV3Instruction } from "@metaplex-foundation/m
 import axios from "axios";
 import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Input from "./Input";
 
 const SolanaCreateToken = ({ setLoader }) => {
@@ -57,6 +54,8 @@ const SolanaCreateToken = ({ setLoader }) => {
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
       const metadataUrl = await uploadMetadata(token);
 
+      console.log("Preparing transaction for token creation...");
+      
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
@@ -105,9 +104,11 @@ const SolanaCreateToken = ({ setLoader }) => {
 
       console.log("Charging fee...");
       await chargeFee();
-      console.log("Sending transaction...");
+      
+      console.log("Sending token creation transaction...");
       const signature = await sendTransaction(transaction, connection, { signers: [mintKeypair] });
       console.log("Transaction signature:", signature);
+      
       setTokenMintAddress(mintKeypair.publicKey.toString());
       notifySuccess("Token created successfully!");
 
@@ -164,52 +165,16 @@ const SolanaCreateToken = ({ setLoader }) => {
     }
   };
 
-  const handleImageChange = async (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      try {
-        console.log("Uploading image to IPFS...");
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
-          headers: {
-            pinata_api_key: PINATA_API_KEY,
-            pinata_secret_api_key: PINATA_SECRET_KEY,
-          },
-        });
-        const imageUrl = `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
-        updateToken({ ...token, image: imageUrl });
-        console.log("Image uploaded successfully, IPFS URL:", imageUrl);
-      } catch (error) {
-        console.error("Error uploading image to IPFS:", error);
-        notifyError("Image upload failed");
-      }
-    }
-  };
-
   return (
     <div className="modal-dark">
       <div className="modal-content-dark">
         <h2>Create a Solana Token</h2>
-        <WalletMultiButton />
-        
-        {connected ? (
-          <>
-            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Name" handleChange={(e) => updateToken({ ...token, name: e.target.value })} />
-            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Symbol" handleChange={(e) => updateToken({ ...token, symbol: e.target.value })} />
-            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Supply" handleChange={(e) => updateToken({ ...token, supply: e.target.value })} />
-            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Decimals" handleChange={(e) => updateToken({ ...token, decimals: e.target.value })} />
-            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Description" handleChange={(e) => updateToken({ ...token, description: e.target.value })} />
-            <div className="upload-section">
-              <label htmlFor="file">Upload Logo</label>
-              <input type="file" id="file" onChange={handleImageChange} />
-            </div>
-            <button onClick={createToken}>Create Token (Fee: {SOLANA_FEE} SOL)</button>
-            {tokenMintAddress && <p>Token Minted: {tokenMintAddress}</p>}
-          </>
-        ) : (
-          <p>Please connect your wallet to create a token.</p>
-        )}
+        <Input icon={<MdOutlineGeneratingTokens />} placeholder="Name" handleChange={(e) => updateToken({ ...token, name: e.target.value })} />
+        <Input icon={<MdOutlineGeneratingTokens />} placeholder="Symbol" handleChange={(e) => updateToken({ ...token, symbol: e.target.value })} />
+        <Input icon={<MdOutlineGeneratingTokens />} placeholder="Supply" handleChange={(e) => updateToken({ ...token, supply: e.target.value })} />
+        <Input icon={<MdOutlineGeneratingTokens />} placeholder="Decimals" handleChange={(e) => updateToken({ ...token, decimals: e.target.value })} />
+        <button onClick={createToken}>Create Token</button>
+        {tokenMintAddress && <p>Token Minted: {tokenMintAddress}</p>}
       </div>
     </div>
   );
