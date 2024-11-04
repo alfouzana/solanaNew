@@ -1,6 +1,6 @@
 // components/SolanaCreateToken.js
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   Keypair,
@@ -8,6 +8,7 @@ import {
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
+  MINT_SIZE,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -17,7 +18,10 @@ import {
   createMintToInstruction,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
-import { createCreateMetadataAccountV3Instruction } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  createCreateMetadataAccountV3Instruction,
+  PROGRAM_ID,
+} from "@metaplex-foundation/mpl-token-metadata";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
@@ -45,7 +49,7 @@ const SolanaCreateToken = ({ setLoader }) => {
   const notifySuccess = (msg) => toast.success(msg, { duration: 2000 });
   const notifyError = (msg) => toast.error(msg, { duration: 2000 });
 
-  const createToken = useCallback(async () => {
+  const createToken = useCallback(async (token) => {
     if (!publicKey) return notifyError("Wallet not connected!");
 
     try {
@@ -55,20 +59,16 @@ const SolanaCreateToken = ({ setLoader }) => {
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
       const metadataUrl = await uploadMetadata(token);
 
-      const [metadataPublicKey] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from("metadata"),
-          TOKEN_PROGRAM_ID.toBuffer(),
-          mintKeypair.publicKey.toBuffer(),
-        ],
-        TOKEN_PROGRAM_ID
+      const [metadataAddress] = await PublicKey.findProgramAddressSync(
+        [Buffer.from("metadata"), PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
+        PROGRAM_ID
       );
 
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
           newAccountPubkey: mintKeypair.publicKey,
-          space: 82,
+          space: MINT_SIZE,
           lamports,
           programId: TOKEN_PROGRAM_ID,
         }),
@@ -83,7 +83,7 @@ const SolanaCreateToken = ({ setLoader }) => {
         createMintToInstruction(mintKeypair.publicKey, tokenATA, publicKey, Number(token.supply) * Math.pow(10, Number(token.decimals))),
         createCreateMetadataAccountV3Instruction(
           {
-            metadata: metadataPublicKey,
+            metadata: metadataAddress,
             mint: mintKeypair.publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
@@ -97,8 +97,11 @@ const SolanaCreateToken = ({ setLoader }) => {
                 uri: metadataUrl,
                 creators: null,
                 sellerFeeBasisPoints: 0,
+                uses: null,
+                collection: null,
               },
               isMutable: false,
+              collectionDetails: null,
             },
           }
         )
@@ -190,7 +193,7 @@ const SolanaCreateToken = ({ setLoader }) => {
               <label htmlFor="file">Upload Logo</label>
               <input type="file" id="file" onChange={handleImageChange} />
             </div>
-            <button onClick={createToken}>Create Token (Fee: {SOLANA_FEE} SOL)</button>
+            <button onClick={() => createToken(token)}>Create Token (Fee: {SOLANA_FEE} SOL)</button>
             {tokenMintAddress && <p>Token Minted: {tokenMintAddress}</p>}
           </>
         ) : (
