@@ -1,14 +1,13 @@
 // components/SolanaCreateToken.js
 
 import React, { useState, useCallback } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
-  Connection,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -25,10 +24,8 @@ import { MdOutlineGeneratingTokens } from "react-icons/md";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Input from "./Input";
 
-// Set up Alchemy RPC connection for Devnet
-const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC, "confirmed");
-
 const SolanaCreateToken = ({ setLoader }) => {
+  const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
   const [tokenMintAddress, setTokenMintAddress] = useState("");
   const [token, updateToken] = useState({
@@ -53,15 +50,10 @@ const SolanaCreateToken = ({ setLoader }) => {
 
     try {
       setLoader(true);
-      console.log("Starting token creation process...");
-
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
       const mintKeypair = Keypair.generate();
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
-      console.log("Mint Keypair and Token ATA generated.");
-
       const metadataUrl = await uploadMetadata(token);
-      console.log("Metadata uploaded, URL:", metadataUrl);
 
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
@@ -92,15 +84,25 @@ const SolanaCreateToken = ({ setLoader }) => {
             updateAuthority: publicKey,
           },
           {
-            createMetadataAccountArgsV3: { data: { name: token.name, symbol: token.symbol, uri: metadataUrl, creators: null, sellerFeeBasisPoints: 0 }, isMutable: false },
+            createMetadataAccountArgsV3: {
+              data: {
+                name: token.name,
+                symbol: token.symbol,
+                uri: metadataUrl,
+                creators: null,
+                sellerFeeBasisPoints: 0,
+                collection: null,  // Explicitly include the collection field
+                uses: null,        // Also include uses if required by your version
+              },
+              isMutable: false,
+              collectionDetails: null,
+            }
           }
         )
       );
 
       await chargeFee();
       const signature = await sendTransaction(transaction, connection, { signers: [mintKeypair] });
-      console.log("Token creation transaction sent with signature:", signature);
-
       setTokenMintAddress(mintKeypair.publicKey.toString());
       notifySuccess("Token created successfully!");
 
@@ -110,12 +112,10 @@ const SolanaCreateToken = ({ setLoader }) => {
     } finally {
       setLoader(false);
     }
-  }, [publicKey, sendTransaction, setLoader, token]);
+  }, [publicKey, connection, sendTransaction, setLoader, token]);
 
   const chargeFee = useCallback(async () => {
     const receiverAddress = new PublicKey(SOLANA_RECEIVER);
-    console.log("Charging fee to:", receiverAddress.toString());
-
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: publicKey,
@@ -125,7 +125,7 @@ const SolanaCreateToken = ({ setLoader }) => {
     );
     await sendTransaction(transaction, connection);
     notifySuccess("Fee charged successfully!");
-  }, [publicKey, sendTransaction, SOLANA_RECEIVER, SOLANA_FEE]);
+  }, [publicKey, sendTransaction, connection, SOLANA_RECEIVER, SOLANA_FEE]);
 
   const uploadMetadata = async (token) => {
     const { name, symbol, description, image } = token;
@@ -144,7 +144,6 @@ const SolanaCreateToken = ({ setLoader }) => {
         },
       });
       console.log("Metadata uploaded successfully.");
-
       return `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
     } catch (error) {
       console.error("Error uploading metadata to IPFS:", error);
@@ -160,16 +159,14 @@ const SolanaCreateToken = ({ setLoader }) => {
         console.log("Uploading image to IPFS...");
         const formData = new FormData();
         formData.append("file", file);
-
         const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
           headers: {
             pinata_api_key: PINATA_API_KEY,
             pinata_secret_api_key: PINATA_SECRET_KEY,
           },
         });
-        const imageUrl = `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
-        console.log("Image uploaded, IPFS URL:", imageUrl);
-        updateToken({ ...token, image: imageUrl });
+        updateToken({ ...token, image: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}` });
+        console.log("Image uploaded, IPFS URL:", `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`);
       } catch (error) {
         console.error("Error uploading image to IPFS:", error);
         notifyError("Image upload failed");
