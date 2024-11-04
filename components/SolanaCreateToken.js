@@ -55,6 +55,15 @@ const SolanaCreateToken = ({ setLoader }) => {
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
       const metadataUrl = await uploadMetadata(token);
 
+      const [metadataPublicKey] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("metadata"),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          mintKeypair.publicKey.toBuffer(),
+        ],
+        TOKEN_PROGRAM_ID
+      );
+
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
@@ -74,10 +83,7 @@ const SolanaCreateToken = ({ setLoader }) => {
         createMintToInstruction(mintKeypair.publicKey, tokenATA, publicKey, Number(token.supply) * Math.pow(10, Number(token.decimals))),
         createCreateMetadataAccountV3Instruction(
           {
-            metadata: PublicKey.findProgramAddressSync(
-              [Buffer.from("metadata"), TOKEN_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
-              TOKEN_PROGRAM_ID
-            )[0],
+            metadata: metadataPublicKey,
             mint: mintKeypair.publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
