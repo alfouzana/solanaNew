@@ -21,7 +21,6 @@ import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
 import UploadICON from "./UploadICON";
 import Input from "./Input";
-import "../public/styles.css";
 
 const SolanaCreateToken = ({ setOpenSolanaTokenCreator, setLoader }) => {
   const { connection } = useConnection();
