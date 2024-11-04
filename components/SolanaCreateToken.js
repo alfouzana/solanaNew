@@ -2,8 +2,6 @@
 
 import React, { useState, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"; // This provides the connect button
-
 import {
   Keypair,
   PublicKey,
@@ -23,26 +21,40 @@ import { createCreateMetadataAccountV3Instruction } from "@metaplex-foundation/m
 import axios from "axios";
 import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
-import UploadICON from "./UploadICON";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Input from "./Input";
 
 const SolanaCreateToken = ({ setLoader }) => {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
   const [tokenMintAddress, setTokenMintAddress] = useState("");
-  const [token, updateToken] = useState({ name: "", symbol: "", supply: "", decimals: "", image: "", description: "" });
+  const [token, updateToken] = useState({
+    name: "",
+    symbol: "",
+    decimals: "",
+    supply: "",
+    image: "",
+    description: "",
+  });
 
-  const notifySuccess = (msg) => toast.success(msg);
-  const notifyError = (msg) => toast.error(msg);
+  const SOLANA_FEE = process.env.NEXT_PUBLIC_SOLANA_FEE;
+  const SOLANA_RECEIVER = process.env.NEXT_PUBLIC_SOLANA_RECEIVER;
+  const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY;
+  const PINATA_SECRET_KEY = process.env.NEXT_PUBLIC_PINATA_SECRET_KEY;
+
+  const notifySuccess = (msg) => toast.success(msg, { duration: 2000 });
+  const notifyError = (msg) => toast.error(msg, { duration: 2000 });
 
   const createToken = useCallback(async () => {
     if (!publicKey) return notifyError("Wallet not connected!");
+
     try {
+      setLoader(true);
       const lamports = await getMinimumBalanceForRentExemptMint(connection);
       const mintKeypair = Keypair.generate();
       const tokenATA = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
       const metadataUrl = await uploadMetadata(token);
-      
+
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
           fromPubkey: publicKey,
@@ -62,7 +74,10 @@ const SolanaCreateToken = ({ setLoader }) => {
         createMintToInstruction(mintKeypair.publicKey, tokenATA, publicKey, Number(token.supply) * Math.pow(10, Number(token.decimals))),
         createCreateMetadataAccountV3Instruction(
           {
-            metadata: PublicKey.findProgramAddressSync([Buffer.from("metadata"), TOKEN_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()], TOKEN_PROGRAM_ID)[0],
+            metadata: PublicKey.findProgramAddressSync(
+              [Buffer.from("metadata"), TOKEN_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
+              TOKEN_PROGRAM_ID
+            )[0],
             mint: mintKeypair.publicKey,
             mintAuthority: publicKey,
             payer: publicKey,
@@ -80,54 +95,66 @@ const SolanaCreateToken = ({ setLoader }) => {
       notifySuccess("Token created successfully!");
 
     } catch (error) {
+      console.error("Token creation failed:", error);
       notifyError("Failed to create token");
+    } finally {
+      setLoader(false);
     }
-  }, [publicKey, connection, sendTransaction]);
+  }, [publicKey, connection, sendTransaction, setLoader, token]);
 
   const chargeFee = useCallback(async () => {
-    const receiverAddress = new PublicKey(process.env.SOLANA_RECEIVER);
+    const receiverAddress = new PublicKey(SOLANA_RECEIVER);
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: publicKey,
         toPubkey: receiverAddress,
-        lamports: LAMPORTS_PER_SOL * Number(process.env.SOLANA_FEE),
+        lamports: LAMPORTS_PER_SOL * Number(SOLANA_FEE),
       })
     );
     await sendTransaction(transaction, connection);
     notifySuccess("Fee charged successfully!");
-  }, [publicKey, sendTransaction, connection]);
+  }, [publicKey, sendTransaction, connection, SOLANA_RECEIVER, SOLANA_FEE]);
 
   const uploadMetadata = async (token) => {
-    const data = JSON.stringify(token);
-  
+    const { name, symbol, description, image } = token;
+    if (!name || !symbol || !description || !image) {
+      notifyError("Missing token metadata fields.");
+      return null;
+    }
+
     try {
-      const response = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS", data, {
+      const response = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS", { name, symbol, description, image }, {
         headers: {
-          pinata_api_key: process.env.NEXT_PUBLIC_PINATA_API_KEY,
-          pinata_secret_api_key: process.env.NEXT_PUBLIC_PINATA_SECRET_KEY,
+          pinata_api_key: PINATA_API_KEY,
+          pinata_secret_api_key: PINATA_SECRET_KEY,
           "Content-Type": "application/json",
         },
       });
-  
       return `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
     } catch (error) {
       console.error("Error uploading metadata to IPFS:", error);
-      throw new Error("Failed to upload metadata to IPFS.");
+      notifyError("Failed to upload metadata to IPFS.");
+      throw new Error("Metadata upload failed");
     }
   };
 
   const handleImageChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
-        headers: {
-          pinata_api_key: process.env.NEXT_PUBLIC_PINATA_API_KEY,
-          pinata_secret_api_key: process.env.NEXT_PUBLIC_PINATA_SECRET_KEY,
-        },
-      });
-      updateToken({ ...token, image: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}` });
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+          headers: {
+            pinata_api_key: PINATA_API_KEY,
+            pinata_secret_api_key: PINATA_SECRET_KEY,
+          },
+        });
+        updateToken({ ...token, image: `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}` });
+      } catch (error) {
+        console.error("Error uploading image to IPFS:", error);
+        notifyError("Image upload failed");
+      }
     }
   };
 
@@ -135,8 +162,6 @@ const SolanaCreateToken = ({ setLoader }) => {
     <div className="modal-dark">
       <div className="modal-content-dark">
         <h2>Create a Solana Token</h2>
-
-        {/* Wallet connect button */}
         <WalletMultiButton />
         
         {connected ? (
@@ -145,11 +170,12 @@ const SolanaCreateToken = ({ setLoader }) => {
             <Input icon={<MdOutlineGeneratingTokens />} placeholder="Symbol" handleChange={(e) => updateToken({ ...token, symbol: e.target.value })} />
             <Input icon={<MdOutlineGeneratingTokens />} placeholder="Supply" handleChange={(e) => updateToken({ ...token, supply: e.target.value })} />
             <Input icon={<MdOutlineGeneratingTokens />} placeholder="Decimals" handleChange={(e) => updateToken({ ...token, decimals: e.target.value })} />
+            <Input icon={<MdOutlineGeneratingTokens />} placeholder="Description" handleChange={(e) => updateToken({ ...token, description: e.target.value })} />
             <div className="upload-section">
               <label htmlFor="file">Upload Logo</label>
               <input type="file" id="file" onChange={handleImageChange} />
             </div>
-            <button onClick={createToken}>Create Token (Fee: {process.env.SOLANA_FEE} SOL)</button>
+            <button onClick={createToken}>Create Token (Fee: {SOLANA_FEE} SOL)</button>
             {tokenMintAddress && <p>Token Minted: {tokenMintAddress}</p>}
           </>
         ) : (
