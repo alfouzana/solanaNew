@@ -14,7 +14,6 @@ function MyApp({ Component, pageProps }) {
   const network = WalletAdapterNetwork.Devnet;
 
   useEffect(() => {
-    // This will only run on the client side
     setIsClient(true);
   }, []);
 
@@ -25,8 +24,11 @@ function MyApp({ Component, pageProps }) {
     return null;
   }
 
+  // Use the environment variable for the endpoint
+  const endpoint = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC || "https://api.devnet.solana.com";
+
   return (
-    <ConnectionProvider endpoint={`https://api.devnet.solana.com`}>
+    <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <Component {...pageProps} />
