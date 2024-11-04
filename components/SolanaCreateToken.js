@@ -90,7 +90,16 @@ const SolanaCreateToken = ({ setLoader }) => {
             updateAuthority: publicKey,
           },
           {
-            createMetadataAccountArgsV3: { data: { name: token.name, symbol: token.symbol, uri: metadataUrl, creators: null, sellerFeeBasisPoints: 0 }, isMutable: false },
+            createMetadataAccountArgsV3: {
+              data: {
+                name: token.name,
+                symbol: token.symbol,
+                uri: metadataUrl,
+                creators: null,
+                sellerFeeBasisPoints: 0,
+              },
+              isMutable: false,
+            },
           }
         )
       );
