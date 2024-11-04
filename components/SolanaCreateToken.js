@@ -1,6 +1,4 @@
-// components/SolanaCreateToken.js
-
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   Keypair,
@@ -22,11 +20,17 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { MdOutlineGeneratingTokens } from "react-icons/md";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import useUserSOLBalanceStore from "../../solana/stores/useUserSOLBalanceStore";
+import { useNetworkConfiguration } from "../../solana/contexts/NetworkConfigurationProvider";
+import UploadICON from "./UploadICON";
 import Input from "./Input";
 
 const SolanaCreateToken = ({ setLoader }) => {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
+  const { balance, getUserSOLBalance } = useUserSOLBalanceStore();
+  const { networkConfiguration } = useNetworkConfiguration();
+
   const [tokenMintAddress, setTokenMintAddress] = useState("");
   const [token, updateToken] = useState({
     name: "",
@@ -44,6 +48,11 @@ const SolanaCreateToken = ({ setLoader }) => {
 
   const notifySuccess = (msg) => toast.success(msg, { duration: 2000 });
   const notifyError = (msg) => toast.error(msg, { duration: 2000 });
+
+  // Fetch balance whenever public key or connection changes
+  useEffect(() => {
+    if (publicKey) getUserSOLBalance(publicKey, connection);
+  }, [publicKey, connection, getUserSOLBalance]);
 
   const createToken = useCallback(async () => {
     if (!publicKey) return notifyError("Wallet not connected!");
