@@ -17,6 +17,7 @@ function MyApp({ Component, pageProps }) {
     setIsClient(true);
   }, []);
 
+  // Initialize wallets only on client side
   const wallets = useMemo(() => [new PhantomWalletAdapter()], [network]);
 
   // Render null on the server to avoid SSR issues
@@ -26,10 +27,12 @@ function MyApp({ Component, pageProps }) {
 
   // Use the environment variable for the endpoint
   const endpoint = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC || "https://api.devnet.solana.com";
+  console.log("Solana endpoint:", endpoint); // Debugging to confirm endpoint is correct
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
+      {/* Temporarily disable autoConnect to ensure button is displayed */}
+      <WalletProvider wallets={wallets} autoConnect={false}>
         <WalletModalProvider>
           <Component {...pageProps} />
         </WalletModalProvider>
